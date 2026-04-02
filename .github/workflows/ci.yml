@@ -1,0 +1,43 @@
+name: CI
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prek:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: j178/prek-action@v2
+
+  test-bootstrap:
+    name: Bootstrap [${{ matrix.os }}]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure (triggers pixi_bootstrap)
+        run: cmake -S tests/test_bootstrap -B build_bootstrap
+
+  test-install-deps:
+    name: Install deps [${{ matrix.os }}]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure (triggers pixi_install_dependencies)
+        run: cmake -S tests/test_boost -B build
+
+      - name: Build
+        run: cmake --build build
