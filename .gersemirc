@@ -1,0 +1,3 @@
+definitions: ["pixi.cmake"]
+indent: 4
+line_length: 120

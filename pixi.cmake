@@ -123,12 +123,7 @@ function(pixi_bootstrap)
     # --- download archive ---------------------------------------------------
     set(_archive_file "${_install_dir}/${_asset_name}")
     message(STATUS "pixi_bootstrap: downloading ${_download_url} ...")
-    file(DOWNLOAD
-        "${_download_url}"
-        "${_archive_file}"
-        SHOW_PROGRESS
-        STATUS _dl_status
-    )
+    file(DOWNLOAD "${_download_url}" "${_archive_file}" SHOW_PROGRESS STATUS _dl_status)
     list(GET _dl_status 0 _dl_code)
     if(NOT _dl_code EQUAL 0)
         list(GET _dl_status 1 _dl_err)
@@ -158,7 +153,6 @@ function(pixi_bootstrap)
 
     message(STATUS "pixi_bootstrap: pixi installed at ${_pixi_exe}")
     set(PIXI_EXECUTABLE "${_pixi_exe}" PARENT_SCOPE)
-
 endfunction()
 
 # ---------------------------------------------------------------------------
@@ -194,9 +188,11 @@ function(pixi_install_dependencies)
     # When cmake is invoked via `pixi run cmake` or inside `pixi shell`,
     # CONDA_PREFIX holds the active environment prefix and PIXI_ENVIRONMENT_NAME
     # holds its name — skip `pixi install` and `pixi info` entirely.
-    if(DEFINED ENV{CONDA_PREFIX}
-       AND DEFINED ENV{PIXI_ENVIRONMENT_NAME}
-       AND "$ENV{PIXI_ENVIRONMENT_NAME}" STREQUAL "${_env_name}")
+    if(
+        DEFINED ENV{CONDA_PREFIX}
+        AND DEFINED ENV{PIXI_ENVIRONMENT_NAME}
+        AND "$ENV{PIXI_ENVIRONMENT_NAME}" STREQUAL "${_env_name}"
+    )
         set(_prefix "$ENV{CONDA_PREFIX}")
         message(STATUS "Already inside pixi environment '${_env_name}': ${_prefix}")
     else()
@@ -305,5 +301,4 @@ function(pixi_install_dependencies)
         _pixi_prepend_env_path(PATH "${_lib_bin_dir}")
         _pixi_prepend_env_path(PATH "${_scripts_dir}")
     endif()
-
 endfunction()

@@ -1,0 +1,10 @@
+ci:
+  autofix_prs: false
+  autoupdate_branch: devel
+  autoupdate_schedule: quarterly
+  submodules: true
+repos:
+- repo: https://github.com/BlankSpruce/gersemi
+  rev: 0.26.1
+  hooks:
+  - id: gersemi
