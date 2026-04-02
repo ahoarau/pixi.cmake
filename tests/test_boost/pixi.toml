@@ -1,0 +1,10 @@
+[workspace]
+name = "test_pixi_boost"
+version = "0.1.0"
+description = "Test project for pixi.cmake"
+authors = ["Test <test@example.com>"]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+[dependencies]
+libboost-devel= ">=1.85.0,<2"
