@@ -17,6 +17,7 @@ It will generate a `pixi.toml` and download the dependencies in the build direct
 cmake_minimum_required(VERSION 3.20)
 
 include(pixi.cmake)
+
 pixi_dependencies(
     DEPENDENCIES [[
 libboost-devel = ">=1.85.0,<2"
