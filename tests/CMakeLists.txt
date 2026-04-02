@@ -35,3 +35,10 @@ add_test(
         "${CMAKE_CTEST_COMMAND}" --build-and-test "${_test_dir}/test_inline_dependencies_dev"
         "${_binary_dir}/test_inline_dependencies_dev" --build-generator "${CMAKE_GENERATOR}"
 )
+
+add_test(
+    NAME fetchcontent_local_source_dir
+    COMMAND
+        "${CMAKE_CTEST_COMMAND}" --build-and-test "${_test_dir}/test_fetchcontent_local_source_dir"
+        "${_binary_dir}/test_fetchcontent_local_source_dir" --build-generator "${CMAKE_GENERATOR}"
+)
