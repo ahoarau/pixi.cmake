@@ -7,6 +7,7 @@ Currently `pixi` is mostly used as a meta package manager that **calls** CMake v
 `pixi.cmake` reverts the way `pixi` is used: now `CMake` **calls** pixi.
 That way, your `CMake` project stay a native `CMake` project.
 
+Please note that you can always use `pixi shell` and start vscode from there to achieve the same result.
 
 ## Install dependencies directly from CMake (without pixi.toml)
 
