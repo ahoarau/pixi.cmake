@@ -1,5 +1,5 @@
 set(_test_dir "${CMAKE_CURRENT_SOURCE_DIR}")
-set(_binary_dir "${CMAKE_CURRENT_BINARY_DIR}")    
+set(_binary_dir "${CMAKE_CURRENT_BINARY_DIR}")
 
 add_test(
     NAME bootstrap
