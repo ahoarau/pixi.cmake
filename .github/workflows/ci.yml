@@ -13,6 +13,25 @@ jobs:
       - uses: actions/checkout@v6
       - uses: j178/prek-action@v2
 
+  test-top-level-build-testing:
+    name: Top-level build testing [${{ matrix.os }}]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure (PIXI_CMAKE_BUILD_TESTING=ON)
+        run: cmake -S . -B build_top_level -DPIXI_CMAKE_BUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build_top_level
+
+      - name: Test
+        run: ctest --test-dir build_top_level --output-on-failure
+
   test-bootstrap:
     name: Bootstrap [${{ matrix.os }}]
     runs-on: ${{ matrix.os }}
