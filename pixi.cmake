@@ -6,14 +6,28 @@
 # pixi_install_dependencies(
 #   [ENVIRONMENT <name>]    # pixi environment to install (default: "default")
 #   [PIXI_VERSION <tag>]    # pin a pixi version for auto-bootstrap, e.g. v0.44.0
+#   [PROJECT_DIR <dir>]     # project directory containing pixi.toml (default: CMAKE_CURRENT_SOURCE_DIR)
 #   [NO_FETCH_PIXI]         # fatal error if pixi is not in PATH instead of bootstrapping
 # )
 #
-# Calls `pixi install` and extends CMAKE_PREFIX_PATH / CMAKE_PROGRAM_PATH /
-# PATH / PKG_CONFIG_PATH so that find_package and find_program work out of
-# the box. When invoked via `pixi run cmake` or inside `pixi shell` the
+# Calls `pixi install` and extends CMAKE_PREFIX_PATH and PATH so that
+# find_package and find_program work out of the box. When invoked via
+# `pixi run cmake` or inside `pixi shell` the
 # active environment prefix is read from $CONDA_PREFIX / $PIXI_ENVIRONMENT_NAME
 # and the pixi install + info steps are skipped entirely.
+#
+# ---------------------------------------------------------------------------
+# pixi_dependencies(
+#   DEPENDENCIES <toml-entries>
+#   [CHANNELS <name...>]    # default: conda-forge
+#   [PLATFORMS <name...>]   # default: linux-64 osx-64 osx-arm64 win-64
+#   [ENVIRONMENT <name>]    # optional named environment (default: "default")
+#   [PIXI_VERSION <tag>]    # pin a pixi version for auto-bootstrap, e.g. v0.44.0
+#   [NO_FETCH_PIXI]         # fatal error if pixi is not in PATH instead of bootstrapping
+# )
+#
+# Generates a pixi.toml under CMAKE_CURRENT_BINARY_DIR/.pixi-cmake/<hash>/
+# and delegates to pixi_install_dependencies(PROJECT_DIR ...).
 #
 # ---------------------------------------------------------------------------
 # pixi_bootstrap(
@@ -46,6 +60,15 @@ function(_pixi_prepend_env_path ENV_VAR NEW_PATH)
         else()
             set(ENV{${ENV_VAR}} "${_native}${_sep}$ENV{${ENV_VAR}}")
         endif()
+    endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
+# Internal helper: ensure a required CMake variable is defined and non-empty.
+# ---------------------------------------------------------------------------
+function(_pixi_require_cmake_var VAR_NAME)
+    if(NOT DEFINED ${VAR_NAME} OR "${${VAR_NAME}}" STREQUAL "")
+        message(FATAL_ERROR "pixi.cmake: required CMake variable '${VAR_NAME}' is not set.")
     endif()
 endfunction()
 
@@ -157,13 +180,11 @@ endfunction()
 
 # ---------------------------------------------------------------------------
 # pixi_install_dependencies([ENVIRONMENT <name>] [PIXI_VERSION <tag>]
-#                               [NO_FETCH_PIXI])
+#                               [PROJECT_DIR <dir>] [NO_FETCH_PIXI])
 #
 # Runs `pixi install` for the given environment and extends:
 #   CMAKE_PREFIX_PATH   — so find_package / find_library / find_path work
-#   CMAKE_PROGRAM_PATH  — so find_program works at configure time
 #   PATH (env)          — so find_program also finds tools via the env PATH
-#   PKG_CONFIG_PATH     — so pkg-config-based packages are discoverable
 #
 # If CMake is invoked through `pixi run cmake` or inside `pixi shell`, the
 # active environment prefix is read directly from $CONDA_PREFIX /
@@ -174,10 +195,17 @@ endfunction()
 # pixi_bootstrap() unless NO_FETCH_PIXI is set.
 # ---------------------------------------------------------------------------
 function(pixi_install_dependencies)
+    _pixi_require_cmake_var(CMAKE_CURRENT_SOURCE_DIR)
+
     set(options NO_FETCH_PIXI)
-    set(oneValueArgs ENVIRONMENT PIXI_VERSION)
+    set(oneValueArgs ENVIRONMENT PIXI_VERSION PROJECT_DIR)
     set(multiValueArgs "")
     cmake_parse_arguments(pixi "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    set(_project_dir "${CMAKE_CURRENT_SOURCE_DIR}")
+    if(DEFINED pixi_PROJECT_DIR AND NOT "${pixi_PROJECT_DIR}" STREQUAL "")
+        set(_project_dir "${pixi_PROJECT_DIR}")
+    endif()
 
     set(_env_name "default")
     if(DEFINED pixi_ENVIRONMENT AND NOT "${pixi_ENVIRONMENT}" STREQUAL "")
@@ -189,7 +217,8 @@ function(pixi_install_dependencies)
     # CONDA_PREFIX holds the active environment prefix and PIXI_ENVIRONMENT_NAME
     # holds its name — skip `pixi install` and `pixi info` entirely.
     if(
-        DEFINED ENV{CONDA_PREFIX}
+        "${_project_dir}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}"
+        AND DEFINED ENV{CONDA_PREFIX}
         AND DEFINED ENV{PIXI_ENVIRONMENT_NAME}
         AND "$ENV{PIXI_ENVIRONMENT_NAME}" STREQUAL "${_env_name}"
     )
@@ -215,8 +244,8 @@ function(pixi_install_dependencies)
             endif()
         endif()
 
-        if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pixi.toml")
-            message(FATAL_ERROR "No pixi.toml found in ${CMAKE_CURRENT_SOURCE_DIR}.")
+        if(NOT EXISTS "${_project_dir}/pixi.toml")
+            message(FATAL_ERROR "No pixi.toml found in ${_project_dir}.")
         endif()
 
         set(_env_args "")
@@ -227,7 +256,7 @@ function(pixi_install_dependencies)
         message(STATUS "Running pixi install...")
         execute_process(
             COMMAND ${PIXI_EXECUTABLE} install ${_env_args}
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            WORKING_DIRECTORY ${_project_dir}
             RESULT_VARIABLE _install_result
         )
         if(NOT _install_result EQUAL 0)
@@ -247,7 +276,7 @@ function(pixi_install_dependencies)
         # and read its "prefix" — the on-disk conda environment root we need.
         execute_process(
             COMMAND ${PIXI_EXECUTABLE} info --json
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            WORKING_DIRECTORY ${_project_dir}
             OUTPUT_VARIABLE _info_json
             OUTPUT_STRIP_TRAILING_WHITESPACE
             RESULT_VARIABLE _info_result
@@ -269,7 +298,7 @@ function(pixi_install_dependencies)
         endif()
 
         if("${_prefix}" STREQUAL "")
-            set(_prefix "${CMAKE_CURRENT_SOURCE_DIR}/.pixi/envs/${_env_name}")
+            set(_prefix "${_project_dir}/.pixi/envs/${_env_name}")
         endif()
     endif()
 
@@ -301,4 +330,107 @@ function(pixi_install_dependencies)
         _pixi_prepend_env_path(PATH "${_lib_bin_dir}")
         _pixi_prepend_env_path(PATH "${_scripts_dir}")
     endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
+# pixi_dependencies(
+#   DEPENDENCIES <toml-entries>
+#   [CHANNELS <name...>]   # default: conda-forge
+#   [PLATFORMS <name...>]  # default: linux-64 osx-64 osx-arm64 win-64
+#   [ENVIRONMENT <name>]
+#   [PIXI_VERSION <tag>]
+#   [NO_FETCH_PIXI]
+# )
+#
+# Creates a generated pixi.toml in the build tree and installs dependencies
+# from that generated project. This is useful when all dependency data should
+# live inside CMake and no source-tree pixi.toml is desired.
+# ---------------------------------------------------------------------------
+function(pixi_dependencies)
+    _pixi_require_cmake_var(CMAKE_CURRENT_SOURCE_DIR)
+    _pixi_require_cmake_var(CMAKE_CURRENT_BINARY_DIR)
+
+    set(options NO_FETCH_PIXI)
+    set(oneValueArgs ENVIRONMENT PIXI_VERSION DEPENDENCIES)
+    set(multiValueArgs CHANNELS PLATFORMS)
+    cmake_parse_arguments(pixi "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    if(NOT DEFINED pixi_DEPENDENCIES OR "${pixi_DEPENDENCIES}" STREQUAL "")
+        message(FATAL_ERROR "pixi_dependencies: DEPENDENCIES is required.")
+    endif()
+
+    if(NOT pixi_CHANNELS)
+        set(pixi_CHANNELS "conda-forge")
+    endif()
+    if(NOT pixi_PLATFORMS)
+        set(pixi_PLATFORMS "linux-64" "osx-64" "osx-arm64" "win-64")
+    endif()
+
+    set(_env_name "default")
+    if(DEFINED pixi_ENVIRONMENT AND NOT "${pixi_ENVIRONMENT}" STREQUAL "")
+        set(_env_name "${pixi_ENVIRONMENT}")
+    endif()
+
+    set(_channels_toml "")
+    foreach(_channel IN LISTS pixi_CHANNELS)
+        if("${_channels_toml}" STREQUAL "")
+            string(APPEND _channels_toml "\"${_channel}\"")
+        else()
+            string(APPEND _channels_toml ", \"${_channel}\"")
+        endif()
+    endforeach()
+
+    set(_platforms_toml "")
+    foreach(_platform IN LISTS pixi_PLATFORMS)
+        if("${_platforms_toml}" STREQUAL "")
+            string(APPEND _platforms_toml "\"${_platform}\"")
+        else()
+            string(APPEND _platforms_toml ", \"${_platform}\"")
+        endif()
+    endforeach()
+
+    set(_manifest_seed "${_channels_toml}|${_platforms_toml}|${_env_name}|${pixi_DEPENDENCIES}")
+    string(SHA256 _manifest_hash "${_manifest_seed}")
+    string(SUBSTRING "${_manifest_hash}" 0 12 _manifest_suffix)
+
+    set(_generated_project_dir "${CMAKE_CURRENT_BINARY_DIR}/.pixi-cmake/${_manifest_suffix}")
+    file(MAKE_DIRECTORY "${_generated_project_dir}")
+
+    set(_environments_toml "")
+    if(NOT "${_env_name}" STREQUAL "default")
+        set(_environments_toml
+            "
+[environments]
+${_env_name} = []
+"
+        )
+    endif()
+
+    set(_generated_toml
+        "
+[workspace]
+name = \"pixi_cmake_${_manifest_suffix}\"
+channels = [${_channels_toml}]
+platforms = [${_platforms_toml}]
+
+${_environments_toml}
+
+[dependencies]
+${pixi_DEPENDENCIES}
+"
+    )
+    file(WRITE "${_generated_project_dir}/pixi.toml" "${_generated_toml}")
+
+    set(_forwarded_args PROJECT_DIR "${_generated_project_dir}")
+    if(DEFINED pixi_ENVIRONMENT AND NOT "${pixi_ENVIRONMENT}" STREQUAL "")
+        list(APPEND _forwarded_args ENVIRONMENT "${pixi_ENVIRONMENT}")
+    endif()
+    if(DEFINED pixi_PIXI_VERSION AND NOT "${pixi_PIXI_VERSION}" STREQUAL "")
+        list(APPEND _forwarded_args PIXI_VERSION "${pixi_PIXI_VERSION}")
+    endif()
+    if(pixi_NO_FETCH_PIXI)
+        list(APPEND _forwarded_args NO_FETCH_PIXI)
+    endif()
+
+    pixi_install_dependencies(${_forwarded_args})
 endfunction()

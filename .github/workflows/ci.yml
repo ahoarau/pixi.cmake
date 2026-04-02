@@ -41,3 +41,51 @@ jobs:
 
       - name: Build
         run: cmake --build build
+
+  test-inline-deps:
+    name: Inline deps [${{ matrix.os }}]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure (triggers pixi_dependencies)
+        run: cmake -S tests/test_inline_dependencies -B build_inline
+
+      - name: Build
+        run: cmake --build build_inline
+
+  test-inline-deps-dev:
+    name: Inline deps dev env [${{ matrix.os }}]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure (triggers pixi_dependencies with ENVIRONMENT)
+        run: cmake -S tests/test_inline_dependencies_dev -B build_inline_dev
+
+      - name: Build
+        run: cmake --build build_inline_dev
+
+  test-inline-deps-defaults:
+    name: Inline deps defaults [${{ matrix.os }}]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure (triggers pixi_dependencies defaults)
+        run: cmake -S tests/test_inline_dependencies_defaults -B build_inline_defaults
+
+      - name: Build
+        run: cmake --build build_inline_defaults
